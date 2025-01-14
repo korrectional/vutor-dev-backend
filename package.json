@@ -15,6 +15,7 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@types/node": "^22.10.5",
+    "fs": "^0.0.1-security",
     "hono": "^4.6.15",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
