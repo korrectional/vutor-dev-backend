@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import bcrypt from 'bcryptjs'
 import { MongoClient } from 'mongodb';
 import { config } from 'dotenv'; // this gets the .env file
+import jwt from 'jsonwebtoken';
 
 config()
 
@@ -12,7 +13,10 @@ config()
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
 
+// setup jwt
+const SECRET_KEY = process.env.JWT_SECRET
 
+// setup hobo
 const api = new Hono()
 const PORT = 3000;
 const corsOptions = {
@@ -68,8 +72,8 @@ api.post('/api/signin', async (c) => {
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
 
-  //typechecks for bcript
   
+  //typechecks for bcript
   const userEmail = await users.findOne({ email: email });
   if (!userEmail) {
     console.error("INCORRECT EMAIL");
@@ -87,6 +91,15 @@ api.post('/api/signin', async (c) => {
     return c.json({ message: "Incorrect password" }, 400); 
   }
 
+  // everything is good so we create the JWT token
+  const token = jwt.sign(
+    { email: email, id: userEmail._id },
+    SECRET_KEY,
+    { expiresIn: "30 days" }
+  )
+  console.log(token);
+
+
   console.log("EMAIL AND PASSWORD CORRECT");
-  return c.json({ message: "Login successful" }, 200);
+  return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
