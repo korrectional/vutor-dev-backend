@@ -97,13 +97,16 @@ api.post('/api/signin', async (c) => {
     SECRET_KEY,
     { expiresIn: "30 days" }
   )
-  console.log(token);
 
-
-  console.log("EMAIL AND PASSWORD CORRECT");
+  console.log("LOGIN SUCCESSFUL");
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
 
 api.post("/api/chats", async (c) => {
+    const db = client.db("voluntorcluster");
+    const messages = db.collection("messages");
+    if (messages) {
+        console.log(messages);
+    }
     return c.json("Recieved");
 })
