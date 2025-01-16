@@ -103,3 +103,7 @@ api.post('/api/signin', async (c) => {
   console.log("EMAIL AND PASSWORD CORRECT");
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
+
+api.post("/api/chats", async (c) => {
+    return c.json("Recieved");
+})
