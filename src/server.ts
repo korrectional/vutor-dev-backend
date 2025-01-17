@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import { MongoClient } from 'mongodb';
 import { config } from 'dotenv'; // this gets the .env file
 import jwt from 'jsonwebtoken';
+import { isToken } from 'typescript';
 
 config()
 
@@ -33,12 +34,21 @@ const httpServer = serve({
   console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3001
 });
 
-
-//Routes
+//Functions
 async function hashPwd(password: string): Promise<string> {
   return await bcrypt.hash(password, 10);
 }
+function verifyToken(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); 
+    return { valid: true, decoded };
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
+}
 
+
+//Routes
 api.get('/api', (c) => {  
   return c.json({ message: 'Server connected' });
 });
@@ -112,4 +122,12 @@ api.post("/api/chats", async (c) => {
     
     const messages = client.db("voluntorcluster").collection("messages");
     return c.json("Recieved");
+})
+
+api.post('api/verify-session', async (c) => {
+  const { token } = await c.req.json();
+
+  const validToken = await verifyToken(token).valid;
+  console.log("Token valid: " + validToken)
+  return c.json({ valid: validToken })
 })
