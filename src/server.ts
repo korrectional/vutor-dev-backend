@@ -107,12 +107,22 @@ api.post('/api/signin', async (c) => {
     SECRET_KEY,
     { expiresIn: "30 days" }
   )
-  console.log(token);
 
+  console.log("LOGIN SUCCESSFUL");
+  const session = database.collection('session');
+  await session.insertOne({ token: token, userId: userEmail._id });
 
-  console.log("EMAIL AND PASSWORD CORRECT");
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
+
+api.post("/api/chats", async (c) => {
+    const header = c.req.header('Authorization');
+    const session = client.db('voluntorcluster').collection('session');
+    if (!header) return c.json({status: 401, message: "Invalid token. Please try logging in again."});
+    
+    const messages = client.db("voluntorcluster").collection("messages");
+    return c.json("Recieved");
+})
 
 api.post('api/verify-session', async (c) => {
   const { token } = await c.req.json();
