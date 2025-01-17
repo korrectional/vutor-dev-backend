@@ -99,14 +99,17 @@ api.post('/api/signin', async (c) => {
   )
 
   console.log("LOGIN SUCCESSFUL");
+  const session = database.collection('session');
+  await session.insertOne({ token: token, userId: userEmail._id });
+
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
 
 api.post("/api/chats", async (c) => {
-    const db = client.db("voluntorcluster");
-    const messages = db.collection("messages");
-    if (messages) {
-        console.log(messages);
-    }
+    const header = c.req.header('Authorization');
+    const session = client.db('voluntorcluster').collection('session');
+    if (!header) return c.json({status: 401, message: "Invalid token. Please try logging in again."});
+    
+    const messages = client.db("voluntorcluster").collection("messages");
     return c.json("Recieved");
 })
