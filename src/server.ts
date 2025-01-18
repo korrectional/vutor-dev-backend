@@ -54,7 +54,7 @@ api.get('/api', (c) => {
 });
 
 api.post('/api/signup', async (c) => {
-  const { email, password } = await c.req.json();
+  const { email, password, phone, fName, lName, isTutor } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
 
@@ -68,6 +68,19 @@ api.post('/api/signup', async (c) => {
   const newUser = {
     email,
     password: pass, // Store hashed password
+    name: (fName + " " + lName),
+    phone: phone,
+    role: isTutor ? "tutor" : "student",
+    chats: [],
+    // the following is information which is later defined by the user
+    description: "",
+    languages: ["en"],
+    state: "",
+    GPA: 0.0,
+    // tutor specific (leave blank for students)
+    teaches: [], // all the classes this tutor teaches
+    rating: 0.0,
+
     createdAt: new Date(),
   };
 
