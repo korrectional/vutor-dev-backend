@@ -7,6 +7,8 @@ import { MongoClient } from 'mongodb';
 import { config } from 'dotenv'; // this gets the .env file
 import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
+import { jwtDecode } from "jwt-decode";
+import { describe } from 'node:test';
 import { RChatData, User } from './interfaces';
 
 config()
@@ -56,7 +58,7 @@ api.get('/api', (c) => {
 });
 
 api.post('/api/signup', async (c) => {
-  const { email, password } = await c.req.json();
+  const { email, password, phone, fName, lName, isTutor } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
 
@@ -70,7 +72,19 @@ api.post('/api/signup', async (c) => {
   const newUser = {
     email,
     password: pass, // Store hashed password
+    name: (fName + " " + lName),
+    phone: phone,
+    role: isTutor ? "tutor" : "student",
     chats: [],
+    // the following is information which is later defined by the user
+    description: "",
+    languages: ["en"],
+    state: "",
+    GPA: 0.0,
+    // tutor specific (leave blank for students)
+    teaches: [], // all the classes this tutor teaches
+    rating: 0.0,
+
     createdAt: new Date(),
   };
 
@@ -137,4 +151,95 @@ api.post("/api/chats", async (c) => {
     }
 
     return c.json({ status: 200, chats: returnData });
+})
+
+api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
+  const { token } = await c.req.json();
+
+  const validToken = await verifyToken(token).valid;
+  console.log("Token valid: " + validToken)
+  return c.json({ valid: validToken })
+})
+
+api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
+  const { token } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  const users = database.collection('user');
+
+  
+  const decoded: any = jwtDecode(token);
+  const email = decoded.email;
+  console.log("email: ", email );
+
+  const userEmail = await users.findOne({ email: email });
+  const validToken = await verifyToken(token);
+  if (!validToken) {
+    return c.json({ message: "invalid token" }, 400);
+  }
+
+  // if everything is OK then proceed!
+  
+  
+  
+  return c.json({ 
+    message: "Data fetched",
+    
+    name: userEmail.name,
+    role: userEmail.role,
+    description: userEmail.description,
+    language: userEmail.language,
+    state: userEmail.state,
+    GPA: userEmail.GPA,
+    teaches: userEmail.teaches
+  }, 200);
+});
+
+api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after settings changed
+  const { token, name, role, description, language, state, GPA, teaches } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  const users = database.collection('user');
+  const decoded: any = jwtDecode(token);
+  const email = decoded.email;
+  console.log("email: ", email );
+  const validToken = await verifyToken(token);
+  if (!validToken) {
+    return c.json({ message: "invalid token" }, 400);
+  }
+
+  // if everything is OK then proceed!
+  try{
+    await users.updateOne(
+      { email: email }, 
+      { $set: { name: name, role: role, description: description, language: language, state: state, GPA: GPA, teaches: teaches } }
+    );
+  }
+  catch(error){
+    console.log(error)
+  }
+  
+  return c.json({ 
+    message: "Data updated"
+  }, 200);
+});
+
+api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
+  const { token, name, language, teaches } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  
+  const validToken = await verifyToken(token);
+  if(!validToken){return c.json({ message: "error" },400)} // invalid token
+
+  let lang = language;
+  if(lang == ""){lang = "en"}
+  const users = await database.collection("user")
+    .find({ role: "tutor", language: lang, teaches: teaches }) // Match role and language
+    .project({_id:0,name:1,GPA:1,description:1})
+    .limit(10) // Limit to a maximum of 10 users
+    .toArray(); // Convert to array
+  console.log(users)
+
+  return c.json(users);
+
+
+
 })
