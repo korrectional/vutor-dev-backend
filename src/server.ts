@@ -8,6 +8,7 @@ import { config } from 'dotenv'; // this gets the .env file
 import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
 import { jwtDecode } from "jwt-decode";
+import { describe } from 'node:test';
 
 config()
 
@@ -129,7 +130,7 @@ api.post('/api/signin', async (c) => {
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
 
-api.post("/api/chats", async (c) => {
+api.post("/api/chats", async (c) => { // this is all fucked
     const header = c.req.header('Authorization');
     const session = client.db('voluntorcluster').collection('session');
     if (!header) return c.json({status: 401, message: "Invalid token. Please try logging in again."});
@@ -186,7 +187,6 @@ api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after
   const decoded: any = jwtDecode(token);
   const email = decoded.email;
   console.log("email: ", email );
-  const userEmail = await users.findOne({ email: email });
   const validToken = await verifyToken(token);
   if (!validToken) {
     return c.json({ message: "invalid token" }, 400);
@@ -208,3 +208,24 @@ api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after
   }, 200);
 });
 
+api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
+  const { token, name, language, teaches } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  
+  const validToken = await verifyToken(token);
+  if(!validToken){return c.json({ message: "error" },400)} // invalid token
+
+  let lang = language;
+  if(lang == ""){lang = "en"}
+  const users = await database.collection("user")
+    .find({ role: "tutor", language: lang, teaches: teaches }) // Match role and language
+    .project({_id:0,name:1,GPA:1,description:1})
+    .limit(10) // Limit to a maximum of 10 users
+    .toArray(); // Convert to array
+  console.log(users)
+
+  return c.json(users);
+
+
+
+})
