@@ -13,4 +13,4 @@ interface RChatData {
     messages: Array<any>
 }
 
-export { User, RChatData}
+export { User, RChatData }

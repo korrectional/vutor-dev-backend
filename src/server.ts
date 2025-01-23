@@ -132,8 +132,7 @@ api.post('/api/signin', async (c) => {
 
 api.post("/api/chats", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
-    if (!header) return c.json({ message: "Invalid Token", status: 401 });
-    if (!verifyToken(header)) return c.json({ message: "Unauthorized access", status: 401 });
+    if (!verifyToken(header).valid) return c.json({ message: "Unauthorized access", status: 401 });
 
     const reqData = await c.req.json();
 
@@ -155,14 +154,6 @@ api.post("/api/chats", async (c) => {
 
 api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
   const { token } = await c.req.json();
-
-  const validToken = await verifyToken(token).valid;
-  console.log("Token valid: " + validToken)
-  return c.json({ valid: validToken })
-})
-
-api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
-  const { token } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
 
@@ -173,13 +164,10 @@ api.post('/api/user/user-data', async (c) => {  // this is to give the user thei
 
   const userEmail = await users.findOne({ email: email });
   const validToken = await verifyToken(token);
-  if (!validToken) {
+  if (!validToken.valid) {
     return c.json({ message: "invalid token" }, 400);
   }
 
-  // if everything is OK then proceed!
-  
-  
   
   return c.json({ 
     message: "Data fetched",
@@ -202,7 +190,7 @@ api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after
   const email = decoded.email;
   console.log("email: ", email );
   const validToken = await verifyToken(token);
-  if (!validToken) {
+  if (!validToken.valid) {
     return c.json({ message: "invalid token" }, 400);
   }
 
@@ -227,7 +215,7 @@ api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note th
   const database = client.db('voluntorcluster');
   
   const validToken = await verifyToken(token);
-  if(!validToken){return c.json({ message: "error" },400)} // invalid token
+  if(!validToken.valid){return c.json({ message: "error" },400)} // invalid token
 
   let lang = language;
   if(lang == ""){lang = "en"}
@@ -236,10 +224,12 @@ api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note th
     .project({_id:0,name:1,GPA:1,description:1})
     .limit(10) // Limit to a maximum of 10 users
     .toArray(); // Convert to array
-  console.log(users)
 
   return c.json(users);
+})
 
-
-
+api.post('/api/verify-token', async (c) => {
+    const { token } = await c.req.json();
+    const validToken = verifyToken(token);
+    return c.json({message: ""}, validToken.valid ? 200 : 401);
 })
