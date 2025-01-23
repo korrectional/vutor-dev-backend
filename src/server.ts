@@ -132,7 +132,7 @@ api.post('/api/signin', async (c) => {
 
 api.post("/api/chats", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
-    if (!verifyToken(header).valid) return c.json({ message: "Unauthorized access", status: 401 });
+    if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
 
     const reqData = await c.req.json();
 
@@ -140,16 +140,36 @@ api.post("/api/chats", async (c) => {
     const user: User = await users.findOne({ email: reqData.email });
     
     const messages = client.db('voluntorcluster').collection('messages');
-    const chats = client.db('voluntorcluster').collection('chats');
 
-    var returnData: Array<RChatData> = [];
+    return c.json({chatIDs: user.chats });
+})
 
-    for (const chat of user.chats) {
-        var msgs = await messages.find({ chatId: parseInt(chat) }).toArray();
-        returnData.push({chatID: parseInt(chat), messages: msgs});
-    }
+api.post("/api/messages/:chatID", async (c) => {
+    const header = c.req.header('Authorization').split(' ')[1];
+    if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
+    
+    const chatID = parseInt(c.req.param('chatID'));
+    const messages = await client.db('voluntorcluster').collection('messages')
+        .find({chatId: chatID})
+        .project({_id:0, chatId:0})
+        .toArray();
 
-    return c.json({ status: 200, chats: returnData });
+    return c.json({messages: messages});
+})
+
+api.post("/api/messages/:chatId/send", async (c) => {
+    const header = c.req.header('Authorization').split(' ')[1];
+    if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
+
+    const {chatID, content, user, createdAt} = await c.req.json();
+    const messagesDB = client.db('voluntorcluster').collection('messages');
+    const message = { chatId: chatID, content, user, createdAt };
+    console.log(message);
+    await messagesDB.insertOne(message).catch(err => {
+        return c.json({ message: err });
+    });
+
+    return c.json({message: "Success"}, 200);
 })
 
 api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
@@ -171,7 +191,6 @@ api.post('/api/user/user-data', async (c) => {  // this is to give the user thei
   
   return c.json({ 
     message: "Data fetched",
-    
     name: userEmail.name,
     role: userEmail.role,
     description: userEmail.description,
@@ -226,10 +245,4 @@ api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note th
     .toArray(); // Convert to array
 
   return c.json(users);
-})
-
-api.post('/api/verify-token', async (c) => {
-    const { token } = await c.req.json();
-    const validToken = verifyToken(token);
-    return c.json({message: ""}, validToken.valid ? 200 : 401);
 })
