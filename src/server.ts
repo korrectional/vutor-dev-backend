@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
 import { jwtDecode } from "jwt-decode";
 import { describe } from 'node:test';
+import { RChatData, User } from './interfaces';
 
 config()
 
@@ -33,13 +34,14 @@ const httpServer = serve({
   fetch: api.fetch,
   port: PORT
 }, (info) => {
-  console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3001
+  console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3000
 });
 
 //Functions
 async function hashPwd(password: string): Promise<string> {
   return await bcrypt.hash(password, 10);
 }
+
 function verifyToken(token) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); 
@@ -124,22 +126,34 @@ api.post('/api/signin', async (c) => {
   )
 
   console.log("LOGIN SUCCESSFUL");
-  const session = database.collection('session');
-  await session.insertOne({ token: token, userId: userEmail._id });
 
   return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
 });
 
-api.post("/api/chats", async (c) => { // this is all fucked
-    const header = c.req.header('Authorization');
-    const session = client.db('voluntorcluster').collection('session');
-    if (!header) return c.json({status: 401, message: "Invalid token. Please try logging in again."});
+api.post("/api/chats", async (c) => {
+    const header = c.req.header('Authorization').split(' ')[1];
+    if (!header) return c.json({ message: "Invalid Token", status: 401 });
+    if (!verifyToken(header)) return c.json({ message: "Unauthorized access", status: 401 });
+
+    const reqData = await c.req.json();
+
+    const users = client.db('voluntorcluster').collection('user');
+    const user: User = await users.findOne({ email: reqData.email });
     
-    const messages = client.db("voluntorcluster").collection("messages");
-    return c.json("Recieved");
+    const messages = client.db('voluntorcluster').collection('messages');
+    const chats = client.db('voluntorcluster').collection('chats');
+
+    var returnData: Array<RChatData> = [];
+
+    for (const chat of user.chats) {
+        var msgs = await messages.find({ chatId: parseInt(chat) }).toArray();
+        returnData.push({chatID: parseInt(chat), messages: msgs});
+    }
+
+    return c.json({ status: 200, chats: returnData });
 })
 
-api.post('api/verify-session', async (c) => {
+api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
   const { token } = await c.req.json();
 
   const validToken = await verifyToken(token).valid;
