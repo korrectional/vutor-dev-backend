@@ -7,6 +7,7 @@ import { MongoClient } from 'mongodb';
 import { config } from 'dotenv'; // this gets the .env file
 import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
+import { jwtDecode } from "jwt-decode";
 
 config()
 
@@ -144,3 +145,66 @@ api.post('api/verify-session', async (c) => {
   console.log("Token valid: " + validToken)
   return c.json({ valid: validToken })
 })
+
+api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
+  const { token } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  const users = database.collection('user');
+
+  
+  const decoded: any = jwtDecode(token);
+  const email = decoded.email;
+  console.log("email: ", email );
+
+  const userEmail = await users.findOne({ email: email });
+  const validToken = await verifyToken(token);
+  if (!validToken) {
+    return c.json({ message: "invalid token" }, 400);
+  }
+
+  // if everything is OK then proceed!
+  
+  
+  
+  return c.json({ 
+    message: "Data fetched",
+    
+    name: userEmail.name,
+    role: userEmail.role,
+    description: userEmail.description,
+    language: userEmail.language,
+    state: userEmail.state,
+    GPA: userEmail.GPA,
+    teaches: userEmail.teaches
+  }, 200);
+});
+
+api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after settings changed
+  const { token, name, role, description, language, state, GPA, teaches } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  const users = database.collection('user');
+  const decoded: any = jwtDecode(token);
+  const email = decoded.email;
+  console.log("email: ", email );
+  const userEmail = await users.findOne({ email: email });
+  const validToken = await verifyToken(token);
+  if (!validToken) {
+    return c.json({ message: "invalid token" }, 400);
+  }
+
+  // if everything is OK then proceed!
+  try{
+    await users.updateOne(
+      { email: email }, 
+      { $set: { name: name, role: role, description: description, language: language, state: state, GPA: GPA, teaches: teaches } }
+    );
+  }
+  catch(error){
+    console.log(error)
+  }
+  
+  return c.json({ 
+    message: "Data updated"
+  }, 200);
+});
+
