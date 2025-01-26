@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Server } from 'socket.io';
 import bcrypt from 'bcryptjs'
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import { config } from 'dotenv'; // this gets the .env file
 import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
@@ -127,7 +127,7 @@ api.post('/api/signin', async (c) => {
 
   console.log("LOGIN SUCCESSFUL");
 
-  return c.json({ message: "Login successful", token: token, email: email, exp:  "30 days"}, 200);
+  return c.json({ message: "Login successful", token: token, email: email, _id: userEmail._id, role: userEmail.role ,exp:  "30 days"}, 200);
 });
 
 api.post("/api/chats", async (c) => {
@@ -240,9 +240,23 @@ api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note th
   if(lang == ""){lang = "en"}
   const users = await database.collection("user")
     .find({ role: "tutor", language: lang, teaches: teaches }) // Match role and language
-    .project({_id:0,name:1,GPA:1,description:1})
+    .project({_id:1,name:1,GPA:1,description:1,rating:1})
     .limit(10) // Limit to a maximum of 10 users
     .toArray(); // Convert to array
 
   return c.json(users);
+})
+
+api.post('/api/get-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
+  const { _id } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  console.log("ID: ", _id);
+  const user = await database.collection("user").findOne(
+    { _id: new ObjectId(_id), role: "tutor" }, // I know ObjectId is deprecated but I couldnt do well with the new one
+    { projection: { _id: 1, name: 1, GPA: 1, description: 1, rating: 1 } } // Projection
+  );
+
+  console.log(user);
+  
+  return c.json(user);
 })
