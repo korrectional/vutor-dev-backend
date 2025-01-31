@@ -37,6 +37,10 @@ const httpServer = serve({
   console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3000
 });
 
+const io = new Server(httpServer, {
+    cors: corsOptions
+});
+
 //Functions
 async function hashPwd(password: string): Promise<string> {
   return await bcrypt.hash(password, 10);
@@ -50,6 +54,11 @@ function verifyToken(token) {
     return { valid: false, error: err.message };
   }
 }
+
+//Sockets
+io.on('connection', (socket) => {
+    console.log('A user connected');
+})
 
 
 //Routes
@@ -138,8 +147,6 @@ api.post("/api/chats", async (c) => {
 
     const users = client.db('voluntorcluster').collection('user');
     const user: User = await users.findOne({ email: reqData.email });
-    
-    const messages = client.db('voluntorcluster').collection('messages');
 
     return c.json({chatIDs: user.chats });
 })
@@ -157,18 +164,17 @@ api.post("/api/messages/:chatID", async (c) => {
     return c.json({messages: messages});
 })
 
-api.post("/api/messages/:chatId/send", async (c) => {
+api.post("/api/chats/send", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
-    if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
+    if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);    
 
     const {chatID, content, user, createdAt} = await c.req.json();
     const messagesDB = client.db('voluntorcluster').collection('messages');
     const message = { chatId: chatID, content, user, createdAt };
-    console.log(message);
     await messagesDB.insertOne(message).catch(err => {
         return c.json({ message: err });
     });
-
+    console.log("Sent message");
     return c.json({message: "Success"}, 200);
 })
 
