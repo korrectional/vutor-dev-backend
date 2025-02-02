@@ -1,45 +1,51 @@
 import { serve } from '@hono/node-server';
+import { createServer } from 'http'
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { Server } from 'socket.io';
 import bcrypt from 'bcryptjs'
-import { MongoClient, ObjectId } from 'mongodb';
-import { config } from 'dotenv'; // this gets the .env file
+import { Int32, MongoClient, ObjectId } from 'mongodb';
+import { config } from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { isToken } from 'typescript';
 import { jwtDecode } from "jwt-decode";
-import { describe } from 'node:test';
-import { RChatData, User } from './interfaces';
+import { ChatMessageData, RChatData, User } from './interfaces';
+import { createNodeWebSocket } from '@hono/node-ws';
 
 config()
 
 // setup mongodb
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
+let activeUsers = new Set();
+let chatRooms = new Map<string, string>();
 
 // setup jwt
 const SECRET_KEY = process.env.JWT_SECRET
 
-// setup hobo
-const api = new Hono()
+// setup hono
+const app = new Hono()
+//const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
 const PORT = 3000;
 const corsOptions = {
     origin: ["http://localhost:5173"],
 };
 
 //Runs the Server
-api.use("/api/*", cors(corsOptions));
+app.use("/api/*", cors(corsOptions));
 
-const httpServer = serve({
-  fetch: api.fetch,
+const server = serve({
+  fetch: app.fetch,
   port: PORT
 }, (info) => {
-  console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3000
+    console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3000
 });
 
-const io = new Server(httpServer, {
+//Socket
+const io = new Server(server, {
     cors: corsOptions
-});
+})
 
 //Functions
 async function hashPwd(password: string): Promise<string> {
@@ -55,18 +61,21 @@ function verifyToken(token) {
   }
 }
 
-//Sockets
-io.on('connection', (socket) => {
-    console.log('A user connected');
-})
-
+async function saveChatMessage(chatID, content, user, createdAt) : Promise<boolean> {
+    const messagesDB = client.db('voluntorcluster').collection('messages');
+    const message = { chatId: chatID, content, user, createdAt };
+    await messagesDB.insertOne(message).catch(err => {
+        return false;
+    });
+    return true;
+}
 
 //Routes
-api.get('/api', (c) => {  
+app.get('/api', (c) => {  
   return c.json({ message: 'Server connected' });
 });
 
-api.post('/api/signup', async (c) => {
+app.post('/api/signup', async (c) => {
   const { email, password, phone, fName, lName, isTutor } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
@@ -103,7 +112,7 @@ api.post('/api/signup', async (c) => {
 });
 
 
-api.post('/api/signin', async (c) => {
+app.post('/api/signin', async (c) => {
   const { email, password } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
@@ -139,7 +148,7 @@ api.post('/api/signin', async (c) => {
   return c.json({ message: "Login successful", token: token, email: email, _id: userEmail._id, role: userEmail.role ,exp:  "30 days"}, 200);
 });
 
-api.post("/api/chats", async (c) => {
+app.post("/api/chats", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
     if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
 
@@ -151,7 +160,7 @@ api.post("/api/chats", async (c) => {
     return c.json({chatIDs: user.chats });
 })
 
-api.post("/api/messages/:chatID", async (c) => {
+app.post("/api/messages/:chatID", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
     if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);
     
@@ -164,21 +173,21 @@ api.post("/api/messages/:chatID", async (c) => {
     return c.json({messages: messages});
 })
 
-api.post("/api/chats/send", async (c) => {
+app.post("/api/chats/send", async (c) => {
     const header = c.req.header('Authorization').split(' ')[1];
     if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);    
 
     const {chatID, content, user, createdAt} = await c.req.json();
-    const messagesDB = client.db('voluntorcluster').collection('messages');
-    const message = { chatId: chatID, content, user, createdAt };
-    await messagesDB.insertOne(message).catch(err => {
-        return c.json({ message: err });
-    });
-    console.log("Sent message");
+    const res = await saveChatMessage(chatID, content, user, createdAt);
+    if (!res) {
+        console.log("Failed to send message");
+        return c.json({ message: "Failed to send message" }, 400);
+    }
+    console.log("Sent message.");
     return c.json({message: "Success"}, 200);
 })
 
-api.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
+app.post('/api/user/user-data', async (c) => {  // this is to give the user their data so they can modify it
   const { token } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
@@ -207,7 +216,7 @@ api.post('/api/user/user-data', async (c) => {  // this is to give the user thei
   }, 200);
 });
 
-api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after settings changed
+app.post('/api/user/user-modify', async (c) => {  // user data is modifyed after settings changed
   const { token, name, role, description, language, state, GPA, teaches } = await c.req.json();
   const database = client.db('voluntorcluster');
   const users = database.collection('user');
@@ -235,7 +244,7 @@ api.post('/api/user/user-modify', async (c) => {  // user data is modifyed after
   }, 200);
 });
 
-api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
+app.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
   const { token, name, language, teaches } = await c.req.json();
   const database = client.db('voluntorcluster');
   
@@ -253,7 +262,7 @@ api.post('/api/search-tutor', async (c) => {  // this is to find tutors. Note th
   return c.json(users);
 })
 
-api.post('/api/get-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
+app.post('/api/get-tutor', async (c) => {  // this is to find tutors. Note that we always search for classes using lowercase ("math" not "Math")
   const { _id } = await c.req.json();
   const database = client.db('voluntorcluster');
   console.log("ID: ", _id);
@@ -266,3 +275,46 @@ api.post('/api/get-tutor', async (c) => {  // this is to find tutors. Note that 
   
   return c.json(user);
 })
+
+io.on('connection', (socket) => {
+    console.log('A user connected: ' + socket.id);
+    activeUsers.add(socket.id);
+    chatRooms.set(socket.id, '-1');
+    
+    socket.on("joinChatRoom", (arg) => {
+        if (chatRooms[socket.id] == "-1") socket.leave(chatRooms[socket.id]);
+        chatRooms.set(socket.id, arg);
+        socket.join(arg);
+    })
+
+    socket.on('send', (arg) => {
+        const id = arg.chatID.toString();
+        socket.to(id).emit('newMessage', arg);
+    })
+
+    socket.on('disconnect', () => {
+        activeUsers.delete(socket.id);
+        chatRooms.delete(socket.id);
+        console.log('user disconnected: ' + socket.id);
+    });
+})
+
+/*app.get('/api/ws',
+    upgradeWebSocket((c) => {
+        return {
+            onOpen(event, ws) {
+                console.log("A user has connected");
+            },
+            onMessage(evt, ws) {
+                const data : ChatMessageData = JSON.parse(evt.data);
+                const toSend = {header: "NewMessage", data: data}
+                ws.send(JSON.stringify(toSend));
+            },
+            onClose: () => {
+                console.log("Connection closed");
+            }
+        }
+    })
+);
+
+injectWebSocket(server);*/

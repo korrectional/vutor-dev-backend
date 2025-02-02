@@ -16,9 +16,16 @@ interface User {
     langauge?: Array<string>
 }
 
+interface ChatMessageData {
+    chatId: Int32,
+    content: string,
+    user: string,
+    createdAt: Date
+}
+
 interface RChatData {
     chatID: number,
     messages: Array<any>
 }
 
-export { User, RChatData}
+export { User, RChatData, ChatMessageData }
