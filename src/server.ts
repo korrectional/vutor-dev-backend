@@ -11,6 +11,7 @@ import { isToken } from 'typescript';
 import { jwtDecode } from "jwt-decode";
 import { ChatMessageData, RChatData, User } from './interfaces';
 import { createNodeWebSocket } from '@hono/node-ws';
+import { profanity, CensorType } from '@2toad/profanity';
 
 config()
 
@@ -106,7 +107,17 @@ app.post('/api/signup', async (c) => {
     createdAt: new Date(),
   };
 
-  await users.insertOne(newUser);
+  
+
+
+
+  try{
+    await users.insertOne(newUser);
+  }
+  catch(error){
+    console.log(error);
+    return c.json({ message: "Did not work" }, 201);  
+  }
 
   return c.json({ message: "Signup successful" }, 201); 
 });
@@ -178,6 +189,14 @@ app.post("/api/chats/send", async (c) => {
     if (!verifyToken(header).valid) return c.json({message: "Unauthorized access"}, 401);    
 
     const {chatID, content, user, createdAt} = await c.req.json();
+    
+    // check if it contains profanity
+    if(profanity.exists(content)){
+        console.log("Profanity detected");
+        return c.json({message: "Profanity detected"}, 400);
+    }
+
+    
     const res = await saveChatMessage(chatID, content, user, createdAt);
     if (!res) {
         console.log("Failed to send message");
