@@ -9,8 +9,9 @@ import { config } from "dotenv";
 import jwt from "jsonwebtoken";
 import { isToken } from "typescript";
 import { jwtDecode } from "jwt-decode";
-import { ChatMessageData, RChatData, User } from "./interfaces";
-import { createNodeWebSocket } from "@hono/node-ws";
+import { ChatMessageData, RChatData, User } from './interfaces';
+import { createNodeWebSocket } from '@hono/node-ws';
+import { profanity, CensorType } from '@2toad/profanity';
 
 config();
 
@@ -83,41 +84,50 @@ app.get("/api", (c) => {
     return c.json({ message: "Server connected" });
 });
 
-app.post("/api/signup", async (c) => {
-    const { email, password, phone, fName, lName, isTutor } =
-        await c.req.json();
-    const database = client.db("voluntorcluster");
-    const users = database.collection("user");
+app.post('/api/signup', async (c) => {
+  const { email, password, phone, fName, lName, isTutor } = await c.req.json();
+  const database = client.db('voluntorcluster');
+  const users = database.collection('user');
 
-    const exists = await users.findOne({ email: email });
-    if (exists) {
-        return c.json({ message: "User already exists" }, 400);
-    }
+  const exists = await users.findOne({ email: email });
+  if (exists) {
+    return c.json({ message: "User already exists" }, 400);
+  }
 
-    const pass = await hashPwd(password);
+  const pass = await hashPwd(password);
+  
+  const newUser = {
+    email,
+    password: pass, // Store hashed password
+    name: (fName + " " + lName),
+    phone: phone,
+    role: isTutor ? "tutor" : "student",
+    chats: [],
+    // the following is information which is later defined by the user
+    description: "",
+    languages: ["en"],
+    state: "",
+    GPA: 0.0,
+    // tutor specific (leave blank for students)
+    teaches: [], // all the classes this tutor teaches
+    rating: 0.0,
 
-    const newUser = {
-        email,
-        password: pass, // Store hashed password
-        name: fName + " " + lName,
-        phone: phone,
-        role: isTutor ? "tutor" : "student",
-        chats: [Number],
-        // the following is information which is later defined by the user
-        description: "",
-        languages: ["en"],
-        state: "",
-        GPA: 0.0,
-        // tutor specific (leave blank for students)
-        teaches: [], // all the classes this tutor teaches
-        rating: 0.0,
+    createdAt: new Date(),
+  };
 
-        createdAt: new Date(),
-    };
+  
 
+
+
+  try{
     await users.insertOne(newUser);
+  }
+  catch(error){
+    console.log(error);
+    return c.json({ message: "Did not work" }, 201);  
+  }
 
-    return c.json({ message: "Signup successful" }, 201);
+  return c.json({ message: "Signup successful" }, 201); 
 });
 
 app.post("/api/signin", async (c) => {
@@ -200,7 +210,15 @@ app.post("/api/chats/send", async (c) => {
     if (!verifyToken(header).valid)
         return c.json({ message: "Unauthorized access" }, 401);
 
-    const { chatID, content, user, createdAt } = await c.req.json();
+    const {chatID, content, user, createdAt} = await c.req.json();
+    
+    // check if it contains profanity
+    if(profanity.exists(content)){
+        console.log("Profanity detected");
+        return c.json({message: "Profanity detected"}, 400);
+    }
+
+    
     const res = await saveChatMessage(chatID, content, user, createdAt);
     if (!res) {
         console.log("Failed to send message");
