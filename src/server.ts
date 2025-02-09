@@ -79,8 +79,36 @@ async function saveChatMessage(
     return true;
 }
 
+
+
 //Routes
 app.get("/api", (c) => {
+    return c.json({ message: "Server connected" });
+});
+
+app.post("/api/hello", async (c) => { // this gives the user a hello world, but also logs their last visit to the website
+    const { token } = await c.req.json();
+    const decoded: any = jwtDecode(token);
+    const email = decoded.email;
+    const database = client.db("voluntorcluster");
+    const users = database.collection("user"); 
+    try {
+        const thisUser = await users.findOne({ email: email });
+        if(thisUser.private_last_visit){
+            return c.json({ message: "Server connected" });
+        }
+        await users.updateOne(
+            { email: email },
+            {
+                $set: {
+                    last_visit: new Date(),
+                },
+            },
+        );
+    } catch (error) {
+        console.log(error);
+    }
+
     return c.json({ message: "Server connected" });
 });
 
@@ -111,6 +139,14 @@ app.post('/api/signup', async (c) => {
     // tutor specific (leave blank for students)
     teaches: [], // all the classes this tutor teaches
     rating: 0.0,
+
+    // managment stuff
+    private_last_visit: false,
+    last_visit: new Date(),
+    profanity: 0,
+    banned: false,
+
+
 
     createdAt: new Date(),
   };
