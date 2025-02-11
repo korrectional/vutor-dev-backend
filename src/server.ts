@@ -206,6 +206,7 @@ app.post("/api/signin", async (c) => {
             email: email,
             _id: userEmail._id,
             role: userEmail.role,
+            name: userEmail.name,
             exp: "30 days",
         },
         200,
@@ -435,7 +436,7 @@ app.post("/api/user/start-chat", async (c) => {
     }
 
     // if everything is OK then proceed!
-    const newId = Math.random() + Math.random() * 10000;
+    const newId = userEmail.name +" and "+ tutorName +"|"+ new Date().getTime();
     try {
         await users.updateOne(
             // update user
