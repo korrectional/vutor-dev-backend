@@ -9,9 +9,9 @@ import { config } from "dotenv";
 import jwt from "jsonwebtoken";
 import { isToken } from "typescript";
 import { jwtDecode } from "jwt-decode";
-import { ChatMessageData, RChatData, User } from './interfaces';
-import { createNodeWebSocket } from '@hono/node-ws';
-import { profanity, CensorType } from '@2toad/profanity';
+import { ChatMessageData, RChatData, User } from "./interfaces";
+import { createNodeWebSocket } from "@hono/node-ws";
+import { profanity, CensorType } from "@2toad/profanity";
 
 config();
 
@@ -79,22 +79,21 @@ async function saveChatMessage(
     return true;
 }
 
-
-
 //Routes
 app.get("/api", (c) => {
     return c.json({ message: "Server connected" });
 });
 
-app.post("/api/hello", async (c) => { // this gives the user a hello world, but also logs their last visit to the website
+app.post("/api/hello", async (c) => {
+    // this gives the user a hello world, but also logs their last visit to the website
     const { token } = await c.req.json();
     const decoded: any = jwtDecode(token);
     const email = decoded.email;
     const database = client.db("voluntorcluster");
-    const users = database.collection("user"); 
+    const users = database.collection("user");
     try {
         const thisUser = await users.findOne({ email: email });
-        if(thisUser.private_last_visit){
+        if (thisUser.private_last_visit) {
             return c.json({ message: "Server connected" });
         }
         await users.updateOne(
@@ -112,58 +111,52 @@ app.post("/api/hello", async (c) => { // this gives the user a hello world, but 
     return c.json({ message: "Server connected" });
 });
 
-app.post('/api/signup', async (c) => {
-  const { email, password, phone, fName, lName, isTutor } = await c.req.json();
-  const database = client.db('voluntorcluster');
-  const users = database.collection('user');
+app.post("/api/signup", async (c) => {
+    const { email, password, phone, fName, lName, isTutor } =
+        await c.req.json();
+    const database = client.db("voluntorcluster");
+    const users = database.collection("user");
 
-  const exists = await users.findOne({ email: email });
-  if (exists) {
-    return c.json({ message: "User already exists" }, 400);
-  }
+    const exists = await users.findOne({ email: email });
+    if (exists) {
+        return c.json({ message: "User already exists" }, 400);
+    }
 
-  const pass = await hashPwd(password);
-  
-  const newUser = {
-    email,
-    password: pass, // Store hashed password
-    name: (fName + " " + lName),
-    phone: phone,
-    role: isTutor ? "tutor" : "student",
-    chats: [],
-    // the following is information which is later defined by the user
-    description: "",
-    languages: ["en"],
-    state: "",
-    GPA: 0.0,
-    // tutor specific (leave blank for students)
-    teaches: [], // all the classes this tutor teaches
-    rating: 0.0,
+    const pass = await hashPwd(password);
 
-    // managment stuff
-    private_last_visit: false,
-    last_visit: new Date(),
-    profanity: 0,
-    banned: false,
+    const newUser = {
+        email,
+        password: pass, // Store hashed password
+        name: fName + " " + lName,
+        phone: phone,
+        role: isTutor ? "tutor" : "student",
+        chats: [],
+        // the following is information which is later defined by the user
+        description: "",
+        languages: ["en"],
+        state: "",
+        GPA: 0.0,
+        // tutor specific (leave blank for students)
+        teaches: [], // all the classes this tutor teaches
+        rating: 0.0,
 
+        // managment stuff
+        private_last_visit: false,
+        last_visit: new Date(),
+        profanity: 0,
+        banned: false,
 
+        createdAt: new Date(),
+    };
 
-    createdAt: new Date(),
-  };
+    try {
+        await users.insertOne(newUser);
+    } catch (error) {
+        console.log(error);
+        return c.json({ message: "Did not work" }, 201);
+    }
 
-  
-
-
-
-  try{
-    await users.insertOne(newUser);
-  }
-  catch(error){
-    console.log(error);
-    return c.json({ message: "Did not work" }, 201);  
-  }
-
-  return c.json({ message: "Signup successful" }, 201); 
+    return c.json({ message: "Signup successful" }, 201);
 });
 
 app.post("/api/signin", async (c) => {
@@ -222,8 +215,19 @@ app.post("/api/chats", async (c) => {
 
     const users = client.db("voluntorcluster").collection("user");
     const user: User = await users.findOne({ email: reqData.email });
+    let chatParticipants = [];
+    const chats = client.db("voluntorcluster").collection("chats");
+    console.log(user.chats);
+    for(let i = 0; i < user.chats.length; i++) {
+        if(user.chats[i] == null || user.chats[i] == '1') continue;
+        console.log(user.chats[i]);
+        const chat = await chats.findOne({ chatID: user.chats[i] });
+        console.log(chat);  
+        chatParticipants.push(chat.participants);
+    }
+    console.log(chatParticipants);
 
-    return c.json({ chatIDs: user.chats });
+    return c.json({ chatIDs: user.chats, chatParticipants: chatParticipants });
 });
 
 app.post("/api/messages/:chatID", async (c) => {
@@ -247,15 +251,14 @@ app.post("/api/chats/send", async (c) => {
     if (!verifyToken(header).valid)
         return c.json({ message: "Unauthorized access" }, 401);
 
-    const {chatID, content, user, createdAt} = await c.req.json();
-    
+    const { chatID, content, user, createdAt } = await c.req.json();
+
     // check if it contains profanity
-    if(profanity.exists(content)){
+    if (profanity.exists(content)) {
         console.log("Profanity detected");
-        return c.json({message: "Profanity detected"}, 400);
+        return c.json({ message: "Profanity detected" }, 400);
     }
 
-    
     const res = await saveChatMessage(chatID, content, user, createdAt);
     if (!res) {
         console.log("Failed to send message");
@@ -419,7 +422,6 @@ io.on("connection", (socket) => {
 );
 
 injectWebSocket(server);*/
-
 app.post("/api/user/start-chat", async (c) => {
     // user data is modifyed after user clicks to start a new chat
     const { token, _id, tutorName } = await c.req.json(); // token is the person starting the chat, _id is the person they wanna chat with
@@ -436,7 +438,8 @@ app.post("/api/user/start-chat", async (c) => {
     }
 
     // if everything is OK then proceed!
-    const newId = userEmail.name +" and "+ tutorName +"|"+ new Date().getTime();
+    //const name = userEmail.name + " and " + tutorName + "|" + new Date().getTime();
+    const newId = Math.floor(Math.random() * 10000000);
     try {
         await users.updateOne(
             // update user
@@ -452,7 +455,7 @@ app.post("/api/user/start-chat", async (c) => {
 
         const newChat = {
             chatID: newId,
-            participats: [userEmail.name, tutorName],
+            participants: [userEmail.name, tutorName],
             createdAt: new Date(),
         };
 
