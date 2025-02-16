@@ -217,15 +217,12 @@ app.post("/api/chats", async (c) => {
     const user: User = await users.findOne({ email: reqData.email });
     let chatParticipants = [];
     const chats = client.db("voluntorcluster").collection("chats");
-    console.log(user.chats);
     for(let i = 0; i < user.chats.length; i++) {
         if(user.chats[i] == null || user.chats[i] == '1') continue;
-        console.log(user.chats[i]);
         const chat = await chats.findOne({ chatID: user.chats[i] });
-        console.log(chat);  
+        if(chat == null) continue; //If the chat Id is invalid.
         chatParticipants.push(chat.participants);
     }
-    console.log(chatParticipants);
 
     return c.json({ chatIDs: user.chats, chatParticipants: chatParticipants });
 });
@@ -403,25 +400,6 @@ io.on("connection", (socket) => {
     });
 });
 
-/*app.get('/api/ws',
-    upgradeWebSocket((c) => {
-        return {
-            onOpen(event, ws) {
-                console.log("A user has connected");
-            },
-            onMessage(evt, ws) {
-                const data : ChatMessageData = JSON.parse(evt.data);
-                const toSend = {header: "NewMessage", data: data}
-                ws.send(JSON.stringify(toSend));
-            },
-            onClose: () => {
-                console.log("Connection closed");
-            }
-        }
-    })
-);
-
-injectWebSocket(server);*/
 app.post("/api/user/start-chat", async (c) => {
     // user data is modifyed after user clicks to start a new chat
     const { token, _id, tutorName } = await c.req.json(); // token is the person starting the chat, _id is the person they wanna chat with
