@@ -12,10 +12,15 @@ import { jwtDecode } from "jwt-decode";
 import { ChatMessageData, RChatData, User } from "./interfaces";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { profanity, CensorType } from "@2toad/profanity";
+import { IncomingForm } from 'formidable';
+import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 config();
 
 // setup mongodb
+
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
 let activeUsers = new Set();
@@ -264,6 +269,49 @@ app.post("/api/chats/send", async (c) => {
     console.log("Sent message.");
     return c.json({ message: "Success" }, 200);
 });
+
+app.post("/api/chats/upload", async (c) => {
+    const header = c.req.header("Authorization").split(" ")[1];
+    if (!verifyToken(header).valid)
+        return c.json({ message: "Unauthorized access" }, 401);
+
+    const formData = await c.req.formData();
+    const chatID = formData.get('chatID');
+    const content = formData.get('content');
+    const user = formData.get('user');
+    const createdAt = formData.get('createdAt');
+    const file = formData.get('file') as File;
+
+    if (!file) return c.json({ error: 'No file uploaded' }, 400);
+
+    const filePath = `./uploads/${randomUUID()}-${file.name}`;
+
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    fs.writeFileSync(filePath, buffer);
+    const fileURL = `uploads/${path.basename(filePath)}`;
+    console.log(fileURL);
+
+    return c.json({ filePath, fileURL }, 200);
+
+});
+
+app.get("/api/uploads/:filename", async (c) => {
+    
+    const filePath = path.join('./uploads', c.req.param('filename'));
+
+
+    if (!fs.existsSync(filePath)) {
+        return c.json({ error: 'File not found' }, 404);
+    }
+
+
+    return c.body(fs.readFileSync(filePath), 200, { 'Content-Type': 'application/octet-stream' });
+
+
+});
+
+
 
 app.post("/api/user/user-data", async (c) => {
     // this is to give the user their data so they can modify it
