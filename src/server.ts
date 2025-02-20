@@ -276,7 +276,9 @@ app.post("/api/chats/send", async (c) => {
     // check if it contains profanity
     if (profanity.exists(content)) {
         console.log("Profanity detected");
-        
+        if(userEmail == null){
+            console.log("This shouldnt be possible, its a hacker AAAAAAAAAAAAAAAAAAAAAAAAAA")
+        }
         await users.updateOne(
             { email: user },
             {
@@ -296,12 +298,14 @@ app.post("/api/chats/send", async (c) => {
         }
         return c.json({ message: "Profanity detected" }, 400);
     }
-    
-    if(userEmail.banned){
-        console.log("User is banned");
-        return c.json({ message: "User is banned" }, 400);
-    }
 
+    if(user != "SYSTEM"){   
+        if(userEmail.banned){
+            console.log("User is banned");
+            return c.json({ message: "User is banned" }, 400);
+        }
+    }
+        
     const res = await saveChatMessage(chatID, content, user, createdAt);
     if (!res) {
         console.log("Failed to send message");
