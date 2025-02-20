@@ -143,13 +143,25 @@ app.post("/api/signup", async (c) => {
         GPA: 0.0,
         // tutor specific (leave blank for students)
         teaches: [], // all the classes this tutor teaches
-        rating: 0.0,
+        rating: 2.5,
+        rated: 1, // so we can count the average rating
+        number_of_students: 0, // stat for tutors
 
         // managment stuff
         private_last_visit: false,
         last_visit: new Date(),
         profanity: 0,
         banned: false,
+
+        // stats
+        number_of_reviews: 0, 
+        number_of_chats: 0,
+        number_of_messages: 0,
+        number_of_visits: 1,
+        number_of_tutors: 0,
+
+        // reviews
+        reviews: [], // [names of tutors]. This exists just to make sure user cant give review twice
 
         createdAt: new Date(),
     };
@@ -188,6 +200,10 @@ app.post("/api/signin", async (c) => {
     if (!isPasswordValid) {
         console.error("INCORRECT PASSWORD");
         return c.json({ message: "Incorrect password" }, 400);
+    }
+    if(userEmail.banned) {
+        console.error("User is banned");
+        return c.json({ message: "User is banned" }, 400);
     }
 
     // everything is good so we create the JWT token
@@ -252,13 +268,38 @@ app.post("/api/chats/send", async (c) => {
     const header = c.req.header("Authorization").split(" ")[1];
     if (!verifyToken(header).valid)
         return c.json({ message: "Unauthorized access" }, 401);
-
+    
     const { chatID, content, user, createdAt } = await c.req.json();
+    const users = client.db("voluntorcluster").collection("user");
+    const userEmail = await users.findOne({ email: user });
 
     // check if it contains profanity
     if (profanity.exists(content)) {
         console.log("Profanity detected");
+        
+        await users.updateOne(
+            { email: user },
+            {
+                $set: {
+                    profanity: userEmail.profanity + 1,
+                },
+            },);
+        if(userEmail.profanity > 5){
+            console.log("User banned");
+            await users.updateOne(
+                { email: user },
+                {
+                    $set: {
+                        banned: true,
+                    },
+                },);
+        }
         return c.json({ message: "Profanity detected" }, 400);
+    }
+    
+    if(userEmail.banned){
+        console.log("User is banned");
+        return c.json({ message: "User is banned" }, 400);
     }
 
     const res = await saveChatMessage(chatID, content, user, createdAt);
