@@ -1,18 +1,14 @@
 import { serve } from "@hono/node-server";
-import { createServer } from "http";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { Server } from "socket.io";
 import bcrypt from "bcryptjs";
-import { Int32, MongoClient, ObjectId } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import { config } from "dotenv";
 import jwt from "jsonwebtoken";
-import { isToken } from "typescript";
 import { jwtDecode } from "jwt-decode";
-import { ChatMessageData, RChatData, User } from "./interfaces";
-import { createNodeWebSocket } from "@hono/node-ws";
-import { profanity, CensorType } from "@2toad/profanity";
-import { IncomingForm } from 'formidable';
+import { User } from "./interfaces";
+import { profanity } from "@2toad/profanity";
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -35,7 +31,7 @@ const app = new Hono();
 
 const PORT = 3000;
 const corsOptions = {
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "http://localhost:80", "http://voluntors.org", "https://voluntors.org"],
 };
 
 //Runs the Server
@@ -162,6 +158,7 @@ app.post("/api/signup", async (c) => {
 
         // reviews
         reviews: [], // [names of tutors]. This exists just to make sure user cant give review twice
+        reviews_allowed: [], // [names of tutors]. User had enough communication with this tutor to give a review
 
         createdAt: new Date(),
     };
@@ -445,13 +442,14 @@ app.post("/api/search-tutor", async (c) => {
     if (lang == "") {
         lang = "en";
     }
+    console.log("Searching for tutors with parameters:", name, lang, teaches);
     const users = await database
         .collection("user")
-        .find({ role: "tutor", language: lang, teaches: teaches }) // Match role and language
+        .find({ role: "tutor", teaches: teaches }) // Match role and language
         .project({ _id: 1, name: 1, GPA: 1, description: 1, rating: 1 })
         .limit(10) // Limit to a maximum of 10 users
         .toArray(); // Convert to array
-
+    console.log(users);
     return c.json(users);
 });
 
@@ -543,3 +541,28 @@ app.post("/api/user/start-chat", async (c) => {
         200,
     );
 });
+
+
+app.post("/api/messages/rate/:chatID/", async (c) => {
+    const chatID = parseInt(c.req.param("chatID"));
+
+
+    // first step is to get the chat item
+    const chatCollection = client.db("voluntorcluster").collection("chats");
+    const chat = chatCollection.findOne({ chatID: chatID });
+
+    // now using the chat item we will find the participant that is not the user
+    const { userName } = await c.req.json();
+    let tutor = chat.participants[0];
+    if(chat.participants[1] != userName){tutor = chat.participants[1];}
+
+    // now we check if the user can vote 
+    const userCollection = client.db("voluntorcluster").collection("user");
+    const userItem = await userCollection.findOne({ name: userName })
+
+
+    // now we will find that participant's item (by the way this is risky)
+    const tutorItem = await userCollection.findOne({ name: tutor })
+    
+    // we found the tutor! 
+}) // I WILL RESUME
