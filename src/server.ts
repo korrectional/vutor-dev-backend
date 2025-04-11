@@ -7,13 +7,45 @@ import { MongoClient, ObjectId } from "mongodb";
 import { config } from "dotenv";
 import jwt from "jsonwebtoken";
 import { jwtDecode } from "jwt-decode";
-import { User } from "./interfaces";
 import { profanity } from "@2toad/profanity";
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { Int32 } from "mongodb";
 
+interface User { // I put them over here so its easier to deploy
+    _id?: any;
+    email?: string;
+    password?: string;
+    phone?: string;
+    role?: string;
+    chats?: Array<string>;
+    description?: string;
+    state?: string;
+    GPA?: string;
+    teaches?: Array<string>;
+    rating?: Int32;
+    created?: Date;
+    langauge?: Array<string>;
+}
+
+interface ChatMessageData {
+    chatId: Int32;
+    content: string;
+    user: string;
+    createdAt: Date;
+}
+
+interface RChatData {
+    chatID: number;
+    messages: Array<any>;
+}
+
+export { User, RChatData, ChatMessageData };
 config();
+
+
+
 
 // setup mongodb
 
@@ -31,7 +63,7 @@ const app = new Hono();
 
 const PORT = 3000;
 const corsOptions = {
-    origin: ["http://localhost:5173", "http://localhost:80", "http://voluntors.org", "https://voluntors.org"],
+    origin: ["http://localhost:5173", "http://localhost:80", "http://voluntors.org", "https://voluntors.org","http://api.voluntors.org","http://dev.voluntors.org"],
 };
 
 //Runs the Server
