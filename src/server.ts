@@ -214,7 +214,7 @@ app.post("/api/signin", async (c) => {
     const userEmail = await users.findOne({ email: email });
     if (!userEmail) {
         console.error("INCORRECT EMAIL");
-        return c.json({ message: "Incorrect email" }, 400);
+        return c.json({ message: "Incorrect email" }, 401);
     }
 
     if (
@@ -228,7 +228,7 @@ app.post("/api/signin", async (c) => {
     const isPasswordValid = await bcrypt.compare(password, userEmail.password);
     if (!isPasswordValid) {
         console.error("INCORRECT PASSWORD");
-        return c.json({ message: "Incorrect password" }, 400);
+        return c.json({ message: "Incorrect password" }, 401);
     }
     if(userEmail.banned) {
         console.error("User is banned");
