@@ -538,6 +538,17 @@ app.post("/api/user/start-chat", async (c) => {
         return c.json({ message: "invalid token" }, 400);
     }
 
+    const sameChat = await chats.findOne({ participants: [userEmail.name, tutorName] });
+    if(sameChat != null){
+        return c.json(
+            {
+                message: "You already have a chat with this person",
+            },
+            400,
+        );
+    }
+    
+
     // if everything is OK then proceed!
     //const name = userEmail.name + " and " + tutorName + "|" + new Date().getTime();
     const newId = Math.floor(Math.random() * 10000000);
