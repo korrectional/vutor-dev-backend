@@ -349,12 +349,13 @@ app.post("/api/chats/upload", async (c) => {
     const file = formData.get('file') as File;
 
     if (!file) return c.json({ error: 'No file uploaded' }, 400);
-
+    console.log("File uploading");
     const filePath = `./uploads/${randomUUID()}-${file.name}`;
-
+    console.log(filePath);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
+    console.log("Written FileSync")
     const fileURL = `uploads/${path.basename(filePath)}`;
     console.log(fileURL);
 
