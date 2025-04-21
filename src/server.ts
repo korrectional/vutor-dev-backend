@@ -40,17 +40,13 @@ interface RChatData {
     chatID: number;
     messages: Array<any>;
 }
-
-export { User, RChatData, ChatMessageData };
 config();
 
-
-
-
 // setup mongodb
-
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
+
+//Manage current users
 let activeUsers = new Set();
 let chatRooms = new Map<string, string>();
 
@@ -59,7 +55,6 @@ const SECRET_KEY = process.env.JWT_SECRET;
 
 // setup hono
 const app = new Hono();
-//const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 const PORT = 3000;
 const corsOptions = {
@@ -73,10 +68,7 @@ const server = serve(
     {
         fetch: app.fetch,
         port: PORT,
-    },
-    (info) => {
-        console.log(`Listening on http://localhost:${PORT}`); // Listening on http://localhost:3000
-    },
+    }
 );
 
 //Socket
@@ -500,11 +492,13 @@ app.post("/api/get-tutor", async (c) => {
     return c.json(user);
 });
 
+//If a user connects
 io.on("connection", (socket) => {
     console.log("A user connected: " + socket.id);
     activeUsers.add(socket.id);
     chatRooms.set(socket.id, "-1");
 
+    //If a user requests to start a chat
     socket.on("joinChatRoom", (arg) => {
         if (chatRooms[socket.id] == "-1") socket.leave(chatRooms[socket.id]);
         chatRooms.set(socket.id, arg);
