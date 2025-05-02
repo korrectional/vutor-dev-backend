@@ -518,6 +518,11 @@ io.on("connection", (socket) => {
     });
 });
 
+app.get("/api/kd", (c) => {
+    return c.json({ XML: "教师感恩/折磨周快乐!" });
+});
+
+
 app.post("/api/user/start-chat", async (c) => {
     // user data is modifyed after user clicks to start a new chat
     const { token, _id, tutorName } = await c.req.json(); // token is the person starting the chat, _id is the person they wanna chat with
