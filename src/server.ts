@@ -136,6 +136,12 @@ app.post("/api/hello", async (c) => {
     return c.json({ message: "Server connected" });
 });
 
+app.get("/api/usercount", (c) => {
+    return c.json({ usercount: 174 }); // this is set manually because
+    // this is called by non-account users
+});
+
+
 app.post("/api/signup", async (c) => {
     const { email, password, phone, fName, lName, isTutor } =
         await c.req.json();
@@ -492,6 +498,7 @@ app.post("/api/get-tutor", async (c) => {
 
     return c.json(user);
 });
+
 
 //If a user connects
 io.on("connection", (socket) => {
