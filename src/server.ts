@@ -16,11 +16,12 @@ import { Int32 } from "mongodb";
 interface User {
     // I put them over here so its easier to deploy
     _id?: any;
+    name?: string;
     email?: string;
     password?: string;
     phone?: string;
     role?: string;
-    chats?: Array<string>;
+    chats?: Array<number>;
     description?: string;
     state?: string;
     GPA?: string;
@@ -271,7 +272,7 @@ app.post("/api/chats", async (c) => {
     let chatParticipants = [];
     const chats = client.db("voluntorcluster").collection("chats");
     for (let i = 0; i < user.chats.length; i++) {
-        if (user.chats[i] == null || user.chats[i] == "1") continue;
+        if (user.chats[i] == null || user.chats[i] === 1) continue;
         const chat = await chats.findOne({ chatID: user.chats[i] });
         if (chat == null) continue; //If the chat Id is invalid.
         chatParticipants.push(chat.participants);
@@ -535,7 +536,7 @@ app.post("/api/user/start-chat", async (c) => {
     // user data is modifyed after user clicks to start a new chat
     const { token, _id, tutorName } = await c.req.json(); // token is the person starting the chat, _id is the person they wanna chat with
     const database = client.db("voluntorcluster");
-    const users = database.collection("user");
+    const users = database.collection<User>("user");
     const chats = database.collection("chats");
     const decoded: any = jwtDecode(token);
     const email = decoded.email;
@@ -599,13 +600,13 @@ app.post("/api/messages/rate/:chatID/", async (c) => {
 
     // first step is to get the chat item
     const chatCollection = client.db("voluntorcluster").collection("chats");
-    const chat = chatCollection.findOne({ chatID: chatID });
+    const chat = await chatCollection.findOne({ chatID: chatID });
 
     // now using the chat item we will find the participant that is not the user
     const { userName } = await c.req.json();
-    let tutor = chat.participants[0];
-    if (chat.participants[1] != userName) {
-        tutor = chat.participants[1];
+    let tutor = chat!.participants[0];
+    if (chat!.participants[1] != userName) {
+        tutor = chat!.participants[1];
     }
 
     // now we check if the user can vote
