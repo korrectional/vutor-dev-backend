@@ -8,12 +8,13 @@ import { config } from "dotenv";
 import jwt from "jsonwebtoken";
 import { jwtDecode } from "jwt-decode";
 import { profanity } from "@2toad/profanity";
-import { randomUUID } from 'crypto';
-import fs from 'fs';
-import path from 'path';
+import { randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
 import { Int32 } from "mongodb";
 
-interface User { // I put them over here so its easier to deploy
+interface User {
+    // I put them over here so its easier to deploy
     _id?: any;
     email?: string;
     password?: string;
@@ -58,18 +59,23 @@ const app = new Hono();
 
 const PORT = 3000;
 const corsOptions = {
-    origin: ["http://localhost:5173", "http://localhost:80", "http://voluntors.org", "https://voluntors.org","http://api.voluntors.org","http://dev.voluntors.org"],
+    origin: [
+        "http://localhost:5173",
+        "http://localhost:80",
+        "http://voluntors.org",
+        "https://voluntors.org",
+        "http://api.voluntors.org",
+        "http://dev.voluntors.org",
+    ],
 };
 
 //Runs the Server
 app.use("/api/*", cors(corsOptions));
 
-const server = serve(
-    {
-        fetch: app.fetch,
-        port: PORT,
-    }
-);
+const server = serve({
+    fetch: app.fetch,
+    port: PORT,
+});
 
 //Socket
 const io = new Server(server, {
@@ -141,7 +147,6 @@ app.get("/api/usercount", (c) => {
     // this is called by non-account users
 });
 
-
 app.post("/api/signup", async (c) => {
     const { email, password, phone, fName, lName, isTutor } =
         await c.req.json();
@@ -180,7 +185,7 @@ app.post("/api/signup", async (c) => {
         banned: false,
 
         // stats
-        number_of_reviews: 0, 
+        number_of_reviews: 0,
         number_of_chats: 0,
         number_of_messages: 0,
         number_of_visits: 1,
@@ -228,7 +233,7 @@ app.post("/api/signin", async (c) => {
         console.error("INCORRECT PASSWORD");
         return c.json({ message: "Incorrect password" }, 401);
     }
-    if(userEmail.banned) {
+    if (userEmail.banned) {
         console.error("User is banned");
         return c.json({ message: "User is banned" }, 400);
     }
@@ -265,10 +270,10 @@ app.post("/api/chats", async (c) => {
     const user: User = await users.findOne({ email: reqData.email });
     let chatParticipants = [];
     const chats = client.db("voluntorcluster").collection("chats");
-    for(let i = 0; i < user.chats.length; i++) {
-        if(user.chats[i] == null || user.chats[i] == '1') continue;
+    for (let i = 0; i < user.chats.length; i++) {
+        if (user.chats[i] == null || user.chats[i] == "1") continue;
         const chat = await chats.findOne({ chatID: user.chats[i] });
-        if(chat == null) continue; //If the chat Id is invalid.
+        if (chat == null) continue; //If the chat Id is invalid.
         chatParticipants.push(chat.participants);
     }
 
@@ -295,7 +300,7 @@ app.post("/api/chats/send", async (c) => {
     const header = c.req.header("Authorization").split(" ")[1];
     if (!verifyToken(header).valid)
         return c.json({ message: "Unauthorized access" }, 401);
-    
+
     const { chatID, content, user, createdAt } = await c.req.json();
     const users = client.db("voluntorcluster").collection("user");
     const userEmail = await users.findOne({ email: user });
@@ -303,8 +308,10 @@ app.post("/api/chats/send", async (c) => {
     // check if it contains profanity
     if (profanity.exists(content)) {
         console.log("Profanity detected");
-        if(userEmail == null){
-            console.log("This shouldnt be possible, its a hacker AAAAAAAAAAAAAAAAAAAAAAAAAA")
+        if (userEmail == null) {
+            console.log(
+                "This shouldnt be possible, its a hacker AAAAAAAAAAAAAAAAAAAAAAAAAA",
+            );
         }
         await users.updateOne(
             { email: user },
@@ -312,8 +319,9 @@ app.post("/api/chats/send", async (c) => {
                 $set: {
                     profanity: userEmail.profanity + 1,
                 },
-            },);
-        if(userEmail.profanity > 5){
+            },
+        );
+        if (userEmail.profanity > 5) {
             console.log("User banned");
             await users.updateOne(
                 { email: user },
@@ -321,18 +329,19 @@ app.post("/api/chats/send", async (c) => {
                     $set: {
                         banned: true,
                     },
-                },);
+                },
+            );
         }
         return c.json({ message: "Profanity detected" }, 400);
     }
 
-    if(user != "SYSTEM"){   
-        if(userEmail.banned){
+    if (user != "SYSTEM") {
+        if (userEmail.banned) {
             console.log("User is banned");
             return c.json({ message: "User is banned" }, 400);
         }
     }
-        
+
     const res = await saveChatMessage(chatID, content, user, createdAt);
     if (!res) {
         console.log("Failed to send message");
@@ -348,43 +357,37 @@ app.post("/api/chats/upload", async (c) => {
         return c.json({ message: "Unauthorized access" }, 401);
 
     const formData = await c.req.formData();
-    const chatID = formData.get('chatID');
-    const content = formData.get('content');
-    const user = formData.get('user');
-    const createdAt = formData.get('createdAt');
-    const file = formData.get('file') as File;
+    const chatID = formData.get("chatID");
+    const content = formData.get("content");
+    const user = formData.get("user");
+    const createdAt = formData.get("createdAt");
+    const file = formData.get("file") as File;
 
-    if (!file) return c.json({ error: 'No file uploaded' }, 400);
+    if (!file) return c.json({ error: "No file uploaded" }, 400);
     console.log("File uploading");
     const filePath = `./uploads/${randomUUID()}-${file.name}`;
     console.log(filePath);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     fs.writeFileSync(filePath, buffer);
-    console.log("Written FileSync")
+    console.log("Written FileSync");
     const fileURL = `uploads/${path.basename(filePath)}`;
     console.log(fileURL);
 
     return c.json({ filePath, fileURL }, 200);
-
 });
 
 app.get("/api/uploads/:filename", async (c) => {
-    
-    const filePath = path.join('./uploads', c.req.param('filename'));
-
+    const filePath = path.join("./uploads", c.req.param("filename"));
 
     if (!fs.existsSync(filePath)) {
-        return c.json({ error: 'File not found' }, 404);
+        return c.json({ error: "File not found" }, 404);
     }
 
-
-    return c.body(fs.readFileSync(filePath), 200, { 'Content-Type': 'application/octet-stream' });
-
-
+    return c.body(fs.readFileSync(filePath), 200, {
+        "Content-Type": "application/octet-stream",
+    });
 });
-
-
 
 app.post("/api/user/user-data", async (c) => {
     // this is to give the user their data so they can modify it
@@ -499,7 +502,6 @@ app.post("/api/get-tutor", async (c) => {
     return c.json(user);
 });
 
-
 //If a user connects
 io.on("connection", (socket) => {
     console.log("A user connected: " + socket.id);
@@ -529,7 +531,6 @@ app.get("/api/kd", (c) => {
     return c.json({ XML: "教师感恩/折磨周快乐!" });
 });
 
-
 app.post("/api/user/start-chat", async (c) => {
     // user data is modifyed after user clicks to start a new chat
     const { token, _id, tutorName } = await c.req.json(); // token is the person starting the chat, _id is the person they wanna chat with
@@ -545,8 +546,10 @@ app.post("/api/user/start-chat", async (c) => {
         return c.json({ message: "invalid token" }, 400);
     }
 
-    const sameChat = await chats.findOne({ participants: [userEmail.name, tutorName] });
-    if(sameChat != null){
+    const sameChat = await chats.findOne({
+        participants: [userEmail.name, tutorName],
+    });
+    if (sameChat != null) {
         return c.json(
             {
                 message: "You already have a chat with this person",
@@ -554,7 +557,6 @@ app.post("/api/user/start-chat", async (c) => {
             400,
         );
     }
-    
 
     // if everything is OK then proceed!
     //const name = userEmail.name + " and " + tutorName + "|" + new Date().getTime();
@@ -592,10 +594,8 @@ app.post("/api/user/start-chat", async (c) => {
     );
 });
 
-
 app.post("/api/messages/rate/:chatID/", async (c) => {
     const chatID = parseInt(c.req.param("chatID"));
-
 
     // first step is to get the chat item
     const chatCollection = client.db("voluntorcluster").collection("chats");
@@ -604,15 +604,21 @@ app.post("/api/messages/rate/:chatID/", async (c) => {
     // now using the chat item we will find the participant that is not the user
     const { userName } = await c.req.json();
     let tutor = chat.participants[0];
-    if(chat.participants[1] != userName){tutor = chat.participants[1];}
+    if (chat.participants[1] != userName) {
+        tutor = chat.participants[1];
+    }
 
-    // now we check if the user can vote 
+    // now we check if the user can vote
     const userCollection = client.db("voluntorcluster").collection("user");
-    const userItem = await userCollection.findOne({ name: userName })
-
+    const userItem = await userCollection.findOne({ name: userName });
 
     // now we will find that participant's item (by the way this is risky)
-    const tutorItem = await userCollection.findOne({ name: tutor })
-    
-    // we found the tutor! 
-}) // I WILL RESUME
+    const tutorItem = await userCollection.findOne({ name: tutor });
+
+    // we found the tutor!
+}); // I WILL RESUME
+
+app.get("/api/itass/getIp", (c) => {
+    const forwardedFor = c.req.header("x-forwarded-for");
+    return c.json({ ip: forwardedFor });
+});
