@@ -620,14 +620,16 @@ app.post("/api/messages/rate/:chatID/", async (c) => {
     // we found the tutor!
 }); // I WILL RESUME
 
-app.get("/api/itass/getip", (c) => {
-    const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
-    const port = c.req.header("x-real-port");
-    return c.json({ ip: ip, port: port });
-});
-
 const udpServer = dgram.createSocket("udp4");
 const peers = {};
+
+udpServer.on("message", (msg, rinfo) => {
+    console.log(`STUN request from ${rinfo.address}:${rinfo.port}`);
+    const response = Buffer.from(
+        JSON.stringify({ ip: rinfo.address, port: rinfo.port }),
+    );
+    udpServer.send(response, rinfo.port, rinfo.address);
+});
 
 udpServer.on("listening", () => {
     const addr = udpServer.address();
