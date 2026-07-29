@@ -12,6 +12,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { Int32 } from "mongodb";
+import dgram from "node:dgram"; // yea this uses udp too...
 
 interface User {
     // I put them over here so its easier to deploy
@@ -619,7 +620,18 @@ app.post("/api/messages/rate/:chatID/", async (c) => {
     // we found the tutor!
 }); // I WILL RESUME
 
-app.get("/api/itass/getIp", (c) => {
-    const forwardedFor = c.req.header("x-forwarded-for");
-    return c.json({ ip: forwardedFor });
+app.get("/api/itass/getip", (c) => {
+    const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
+    const port = c.req.header("x-real-port");
+    return c.json({ ip: ip, port: port });
 });
+
+const udpServer = dgram.createSocket("udp4");
+const peers = {};
+
+udpServer.on("listening", () => {
+    const addr = udpServer.address();
+    console.log(`UDP rendezvous server on ${addr.address}:${addr.port}`);
+});
+
+udpServer.bind(4000);
