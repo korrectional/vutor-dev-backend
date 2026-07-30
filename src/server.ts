@@ -621,12 +621,51 @@ app.post("/api/messages/rate/:chatID/", async (c) => {
 }); // I WILL RESUME
 
 const udpServer = dgram.createSocket("udp4");
-const peers = {};
+const peers = [
+    { address: "", port: 0, updated: 0 },
+    { address: "", port: 0, updated: 0 },
+    { address: "0", port: 0, updated: 0 },
+];
 
 udpServer.on("message", (msg, rinfo) => {
     console.log(`STUN request from ${rinfo.address}:${rinfo.port}`);
+    let desiredPeer = 2;
+    if (rinfo.address === peers[0].address) {
+        peers[0].updated = Date.now();
+        peers[0].port = rinfo.port;
+        Date.now() - peers[1].updated < 12000
+            ? (desiredPeer = 1)
+            : (desiredPeer = 2);
+    } else if (rinfo.address === peers[1].address) {
+        peers[1].updated = Date.now();
+        peers[1].port = rinfo.port;
+        Date.now() - peers[0].updated < 12000
+            ? (desiredPeer = 0)
+            : (desiredPeer = 2);
+    } else {
+        if (Date.now() - peers[0].updated > 12000) {
+            // you are peer 0!!
+            peers[0].address = rinfo.address;
+            peers[0].port = rinfo.port;
+            peers[0].updated = Date.now();
+            desiredPeer = 2;
+        } else if (Date.now() - peers[1].updated > 12000) {
+            // you are peer 1!!
+            peers[1].address = rinfo.address;
+            peers[1].port = rinfo.port;
+            peers[1].updated = Date.now();
+            desiredPeer = 2;
+        } else {
+            // WTF? Why is this happening? Is there a 3rd esp32?? Did you just change ports? Lets wait and see!
+            desiredPeer = 2; // yea this is useless but it gives space for some nice future error handling
+        }
+    }
+
     const response = Buffer.from(
-        JSON.stringify({ ip: rinfo.address, port: rinfo.port }),
+        JSON.stringify({
+            ip: peers[desiredPeer].address,
+            port: peers[desiredPeer].port,
+        }),
     );
     udpServer.send(response, rinfo.port, rinfo.address);
 });
