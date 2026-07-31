@@ -629,6 +629,12 @@ const peers = [
 
 udpServer.on("message", (msg, rinfo) => {
     console.log(`STUN request from ${rinfo.address}:${rinfo.port}`);
+
+    if (msg.toString().trim() === "report") {
+        const response = Buffer.from(JSON.stringify(peers));
+        udpServer.send(response, rinfo.port, rinfo.address);
+        return;
+    }
     let desiredPeer = 2;
     if (rinfo.address === peers[0].address) {
         peers[0].updated = Date.now();
