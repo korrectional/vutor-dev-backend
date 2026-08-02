@@ -669,7 +669,7 @@ udpServer.on("message", (msg, rinfo) => {
 
     const response = Buffer.from(
         JSON.stringify({
-            adress: peers[desiredPeer].address,
+            address: peers[desiredPeer].address,
             port: peers[desiredPeer].port,
         }),
     );
